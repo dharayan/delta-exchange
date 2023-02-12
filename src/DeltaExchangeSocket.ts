@@ -29,12 +29,12 @@ export class DeltaExchangeSocket {
   }
 
   authenticate() {
-    const timestamp = DeltaExchangeClient.get_time_stamp()
+    const timestamp = DeltaExchangeClient.getTimeStamp()
     this.websocket.send(JSON.stringify({
       "type": "auth",
       "payload": {
         "api-key": this.api_key,
-        "signature": DeltaExchangeClient.sign_message(this.api_secret, "GET" + timestamp + "/live"),
+        "signature": DeltaExchangeClient.signMessage(this.api_secret, "GET" + timestamp + "/live"),
         "timestamp": timestamp
       }
     }))
@@ -54,19 +54,19 @@ export class DeltaExchangeSocket {
     }))
   }
 
-  subscribe_to_tickers(...symbols: string[]) {
+  subscribeToTickers(...symbols: string[]) {
     this.subscribe("ticker", ...symbols)
   }
 
-  subscribe_to_tickers_v2(...symbols: string[]) {
+  subscribeToTickersV2(...symbols: string[]) {
     this.subscribe("v2/ticker", ...symbols)
   }
 
-  subscribe_to_order_books(...symbols: string[]) {
+  subscribeToOrderBooks(...symbols: string[]) {
     this.subscribe("l2_orderbook", ...symbols)
   }
 
-  subscribe_to_mark_prices(...symbols: string[]) {
+  subscribeToMarkPrices(...symbols: string[]) {
     this.subscribe("mark_price", ...symbols.map(symbol => `MARK:${symbol}`))
   }
 
@@ -74,57 +74,57 @@ export class DeltaExchangeSocket {
     this.subscribe("spot_price", ...symbols.map(symbol => symbol.toUpperCase() === "BTCUSDT".toUpperCase() ? ".DEXBTUSDT" : `.DE${symbol}`))
   }
 
-  subscribe_to_price_movements(...symbols: string[]) {
+  subscribeToPriceMovements(...symbols: string[]) {
     this.subscribe_to_spot_prices(...symbols)
-    this.subscribe_to_mark_prices(...symbols)
-    this.subscribe_to_order_books(...symbols)
-    this.subscribe_to_tickers(...symbols)
+    this.subscribeToMarkPrices(...symbols)
+    this.subscribeToOrderBooks(...symbols)
+    this.subscribeToTickers(...symbols)
   }
 
-  subscribe_to_candle_sticks(resolution: string, ...symbols: string[]) {
+  subscribeToCandleSticks(resolution: string, ...symbols: string[]) {
     this.subscribe("candlestick_" + resolution, ...symbols)
   }
 
-  subscribe_to_product_updates() {
+  subscribeToProductUpdates() {
     this.subscribe("product_updates")
   }
 
-  subscribe_to_announcements() {
+  subscribeToAnnouncements() {
     this.subscribe("announcements")
   }
 
-  subscribe_to_positions(...symbols: string[]) {
+  subscribeToPositions(...symbols: string[]) {
     this.subscribe("positions", ...symbols)
   }
 
-  subscribe_to_margins() {
+  subscribeToMargins() {
     this.subscribe("margins")
   }
 
-  subscribe_to_orders(...symbols: string[]) {
+  subscribeToOrders(...symbols: string[]) {
     this.subscribe("orders", ...symbols)
   }
 
-  subscribe_to_fills(...symbols: string[]) {
+  subscribeToFills(...symbols: string[]) {
     this.subscribe("user_trades", ...symbols)
   }
 
-  subscribe_to_trading_activity(...symbols: string[]) {
-    this.subscribe_to_fills(...symbols)
-    this.subscribe_to_orders(...symbols)
-    this.subscribe_to_positions(...symbols)
-    this.subscribe_to_margins()
+  subscribeToTradingActivity(...symbols: string[]) {
+    this.subscribeToFills(...symbols)
+    this.subscribeToOrders(...symbols)
+    this.subscribeToPositions(...symbols)
+    this.subscribeToMargins()
   }
 
   close() {
     this.websocket.close()
   }
 
-  on_message(handler: (message: any) => void) {
+  onMessage(handler: (message: any) => void) {
     this.websocket.on("message", handler)
   }
 
-  send_message(message: any) {
+  sendMessage(message: any) {
     if (typeof message === "string")
       this.websocket.send(message)
     else

@@ -19,13 +19,12 @@ export class DeltaExchangeClient {
   }
 
   //! static methods
-  static sign_message(secret: string, message: string): string {
+  static signMessage(secret: string, message: string): string {
     return crypto.createHmac("sha256", secret)
       .update(Buffer.from(message, 'utf-8')).digest("hex");
   }
 
   static quoteChar(c: string) {
-    // @ts-ignore
     return '%' + c.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()
   }
 
@@ -33,17 +32,17 @@ export class DeltaExchangeClient {
     return encodeURIComponent(s).replace(/[()*!']/g, this.quoteChar).replace(/%2F/g, '/')
   }
 
-  static quote_plus(s: string) {
+  static quotePlus(s: string) {
     return this.quote(s).replace(/%20/g, '+')
   }
 
-  static build_query(queries: Query[]): string {
+  static buildQuery(queries: Query[]): string {
     if (!queries?.length)
       return ''
-    return '?' + queries.map(q => `${q.key}=${this.quote_plus(q.value)}`).join('&')
+    return '?' + queries.map(q => `${q.key}=${this.quotePlus(q.value)}`).join('&')
   }
 
-  static get_time_stamp(): number {
+  static getTimeStamp(): number {
     return Math.floor(Date.now() / 1000);
   }
 
@@ -55,7 +54,7 @@ export class DeltaExchangeClient {
     })
   }
 
-  static resolution_to_minute = (resolution: string) => {
+  static resolutionToMinute = (resolution: string) => {
     switch (resolution) {
       case Resolution._1m:
         return 1
@@ -84,7 +83,7 @@ export class DeltaExchangeClient {
     }
   }
 
-  is_authenticated() {
+  isAuthenticated() {
     return this.authenticated;
   }
 
@@ -92,7 +91,7 @@ export class DeltaExchangeClient {
     if (!base_url) {
       base_url = this.base_url;
     }
-    const url = base_url + path + DeltaExchangeClient.build_query(queries || [])
+    const url = base_url + path + DeltaExchangeClient.buildQuery(queries || [])
     headers['Content-Type'] = 'application/json'
     headers['Accept'] = 'application/json'
 
@@ -100,16 +99,15 @@ export class DeltaExchangeClient {
       if (!this.api_key || !this.api_secret) {
         throw new Error('Authentication required!')
       }
-      const timestamp = DeltaExchangeClient.get_time_stamp();
-      const signature_data = method + timestamp + path + DeltaExchangeClient.build_query(queries || []) + (payload ? JSON.stringify(payload) : "")
-      const signature = DeltaExchangeClient.sign_message(this.api_secret, signature_data)
+      const timestamp = DeltaExchangeClient.getTimeStamp();
+      const signature_data = method + timestamp + path + DeltaExchangeClient.buildQuery(queries || []) + (payload ? JSON.stringify(payload) : "")
+      const signature = DeltaExchangeClient.signMessage(this.api_secret, signature_data)
       headers['api-key'] = this.api_key
       headers['timestamp'] = timestamp
       headers['signature'] = signature
     }
 
-    headers['User-Agent'] = 'delta-ts-rest-client-v1.0.0'
-    // console.log(headers)
+    headers['User-Agent'] = 'delta-exchange-rest-client-v0.2.3'
 
     headers = {
       ...headers
@@ -118,16 +116,16 @@ export class DeltaExchangeClient {
     return await fetch(url, {
       method: method,
       headers: headers,
-      body: method === "GET" ? undefined : JSON.stringify(payload)
-    } as any).then(res => res.json())
+      body: method === "GET" ? undefined : payload ? JSON.stringify(payload) : undefined
+    }).then(res => res.json())
   }
 
   //! access account status and data
-  async get_assets() {
+  async getAssets() {
     return await this.request('/assets')
   }
 
-  async get_balances(asset_id?: number): Promise<Balance> {
+  async getBalances(asset_id?: number): Promise<Balance> {
     const balances = await this.request("/v2/wallet/balances", "GET", undefined, undefined, true)
     if (asset_id) {
       // filter by asset_id and return only one balance
@@ -147,13 +145,13 @@ export class DeltaExchangeClient {
     return balancesObj;
   }
 
-  async set_leverage(product_id: string, leverage: number) {
+  async setLeverage(product_id: string, leverage: number) {
     return this.request(`/v2/products/${product_id}/orders/leverage`, "POST", {
       leverage: leverage
     }, undefined, true)
   }
 
-  async get_order_history(queries: Query[] = [], page_size = 10, after: any = undefined) {
+  async getOrderHistory(queries: Query[] = [], page_size = 10, after: any = undefined) {
     if (after)
       queries = [...queries, {key: 'after', value: after}];
     if (page_size)
@@ -161,7 +159,7 @@ export class DeltaExchangeClient {
     return await this.request('/v2/orders/history', 'GET', undefined, queries)
   }
 
-  async get_fill_history(queries: Query[] = [], page_size = 10, after: any = undefined) {
+  async getFillHistory(queries: Query[] = [], page_size = 10, after: any = undefined) {
     if (after)
       queries = [...queries, {key: 'after', value: after}];
     if (page_size)
@@ -169,14 +167,14 @@ export class DeltaExchangeClient {
     return await this.request('/v2/fills', 'GET', undefined, queries)
   }
 
-  async change_position_margin(product_id: string, delta_margin: number) {
+  async changePositionMargin(product_id: string, delta_margin: number) {
     return await this.request('/v2/positions/change_margin', 'POST', {
       product_id: product_id,
       delta_margin: delta_margin
     }, undefined, true)
   }
 
-  async get_positions(product_ids: string[]): Promise<Position[]> {
+  async getPositions(product_ids: string[]): Promise<Position[]> {
     return (await this.request('/v2/positions/margined', 'GET', undefined, [{
       key: 'product_id',
       value: product_ids.join(",")
@@ -184,7 +182,7 @@ export class DeltaExchangeClient {
   }
 
   //! get contract details
-  async get_options(symbol?: string, expiry?: string, turnover_symbol?: string): Promise<Option[]> {
+  async getOptions(symbol?: string, expiry?: string, turnover_symbol?: string): Promise<Option[]> {
     if (!symbol)
       if (this.lastAllOptionFetchTime + 1000 * 30 > Date.now())
         if (this.lastFetchedAllOptions.length > 0)
@@ -236,13 +234,13 @@ export class DeltaExchangeClient {
     return requiredOptions
   }
 
-  async get_option_chain(symbol: string, expiry: string, turnover_symbol?: string): Promise<OptionChain> {
-    const optionChains: OptionChains = await this.get_option_chains(symbol, turnover_symbol)
+  async getOptionChain(symbol: string, expiry: string, turnover_symbol?: string): Promise<OptionChain> {
+    const optionChains: OptionChains = await this.getOptionChains(symbol, turnover_symbol)
     return optionChains[expiry];
   }
 
-  async get_option_chains(symbol: string, turnover_symbol?: string): Promise<OptionChains> {
-    const options = await this.get_options(symbol, undefined, turnover_symbol)
+  async getOptionChains(symbol: string, turnover_symbol?: string): Promise<OptionChains> {
+    const options = await this.getOptions(symbol, undefined, turnover_symbol)
     const optionChains: OptionChains = {}
     for (const option of options) {
       const expiry = option.expiry;
@@ -268,27 +266,27 @@ export class DeltaExchangeClient {
     return optionChains
   }
 
-  async get_ticker_details(symbol: string): Promise<Ticker> {
+  async getTickerDetails(symbol: string): Promise<Ticker> {
     return (await this.request(`/v2/tickers/${symbol}`)).result
   }
 
-  async get_active_orders(): Promise<Order[]> {
+  async getActiveOrders(): Promise<Order[]> {
     return (await this.request(`/v2/orders`, 'GET', undefined, [], true))?.result
   }
 
-  async get_all_positions(): Promise<Position[]> {
+  async getAllPositions(): Promise<Position[]> {
     return (await this.request('/v2/positions/margined', 'GET', undefined, undefined, true))?.result || []
   }
 
-  async get_orderbook(symbol: string) {
+  async getOrderbook(symbol: string) {
     return await this.request(`/v2/l2orderbook/${symbol}`)
   }
 
-  async get_sparklines(symbol: string) {
+  async getSparklines(symbol: string) {
     return await this.request(`/v2/sparklines`, 'GET', undefined, [{key: 'symbol', value: symbol}])
   }
 
-  async get_ohlc(symbol: string, resolution: string, start: number, end: number): Promise<Candle[]> {
+  async getOHLC(symbol: string, resolution: string, start: number, end: number): Promise<Candle[]> {
     return (await this.request(`/v2/history/candles`, 'GET', undefined, [
       {key: 'symbol', value: symbol},
       {key: 'resolution', value: resolution},
@@ -297,12 +295,12 @@ export class DeltaExchangeClient {
     ]))?.result
   }
 
-  async get_mark_ohlc(symbol: string, resolution: string, start: number, end: number) {
-    return this.get_ohlc(`MARK:${symbol}`, resolution, start, end)
+  async getMarkOHLC(symbol: string, resolution: string, start: number, end: number) {
+    return this.getOHLC(`MARK:${symbol}`, resolution, start, end)
   }
 
   //! create trades
-  async create_order(
+  async createOrder(
     // required
     product_id: number, side: string, size: number, order_type: string, limit_price?: number,
     // bracket order
@@ -338,7 +336,7 @@ export class DeltaExchangeClient {
     }, undefined, true)
   }
 
-  async create_bracket_order(
+  async createBracketOrder(
     // required
     product_id: number, side: string, size: number, order_type: string, limit_price?: number,
     // bracket order
@@ -349,7 +347,7 @@ export class DeltaExchangeClient {
     close_on_trigger?: boolean, client_order_id?: string, time_in_force?: string,
     reduce_only?: boolean, post_only?: boolean,
   ) {
-    return await this.create_order(
+    return await this.createOrder(
       // required
       product_id, side, size, order_type, limit_price,
       // bracket order
@@ -363,8 +361,7 @@ export class DeltaExchangeClient {
     )
   }
 
-
-  async create_stop_only_order(
+  async createStopOnlyOrder(
     // required
     product_id: number, side: string, size: number, order_type: string, stop_price: number,
     // stop/limit order
@@ -373,7 +370,7 @@ export class DeltaExchangeClient {
     close_on_trigger?: boolean, post_only?: boolean,
     client_order_id?: string, time_in_force?: string
   ) {
-    return await this.create_order(
+    return await this.createOrder(
       // required
       product_id, side, size, order_type, limit_price,
       // undefined(s)
@@ -384,7 +381,7 @@ export class DeltaExchangeClient {
     )
   }
 
-  async create_limit_order(
+  async createLimitOrder(
     // required
     product_id: number, side: string, size: number, order_type: string, limit_price?: number,
     // stop order
@@ -393,7 +390,7 @@ export class DeltaExchangeClient {
     close_on_trigger?: boolean, client_order_id?: string, time_in_force?: string,
     reduce_only?: boolean, post_only?: boolean,
   ) {
-    return await this.create_order(
+    return await this.createOrder(
       // required
       product_id, side, size, order_type, limit_price,
       // bracket order
