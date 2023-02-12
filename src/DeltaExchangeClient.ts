@@ -8,7 +8,6 @@ export class DeltaExchangeClient {
   private readonly api_secret: string;
   private readonly base_url: string = "https://api.delta.exchange";
   private readonly authenticated: boolean;
-  //! get contract details
   private lastAllOptionFetchTime: number = 0;
   private lastFetchedAllOptions: Option[] = [];
 
@@ -234,7 +233,7 @@ export class DeltaExchangeClient {
     return requiredOptions
   }
 
-  async getOptionChain(symbol: string, expiry: string, turnover_symbol?: string): Promise<OptionChain> {
+  async getOptionChain(symbol: string, expiry: string, turnover_symbol?: string): Promise<OptionChain | undefined> {
     const optionChains: OptionChains = await this.getOptionChains(symbol, turnover_symbol)
     return optionChains[expiry];
   }
@@ -246,10 +245,7 @@ export class DeltaExchangeClient {
       const expiry = option.expiry;
       if (!optionChains[expiry])
         optionChains[expiry] = {}
-      // console.log(option)
-      // const optionSymbol: string = option.symbol
       const optionStrike: number = option.strike_price
-      // const optionExpiry: any = optionSymbol.split("-")[3]
       if (!optionChains[expiry][optionStrike])
         optionChains[expiry][optionStrike] = {
           call: null,

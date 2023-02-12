@@ -1,6 +1,6 @@
 {
   "name": "delta-exchange",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "repository": "https://github.com/dharayan/delta-exchange",
   "license": "MIT",
   "scripts": {

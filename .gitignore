@@ -1,6 +1,8 @@
 .idea
 lib
 node_modules
-npm pac
+
 *.log
 *.tgz
+.env.*
+.env

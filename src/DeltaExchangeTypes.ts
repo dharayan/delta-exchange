@@ -182,7 +182,9 @@ export interface Candle {
   volume: number
 }
 
-export interface MinimalOption {
+
+export interface Option {
+  id: number;
   symbol: string;
   expiry: string;
   type: "call" | "put";
@@ -191,14 +193,6 @@ export interface MinimalOption {
   best_bid: number;
   best_ask: number;
   spot_price: number;
-  candles?: {
-    high: number,
-    low: number,
-  }[];
-}
-
-export interface Option extends MinimalOption {
-  id: number;
   timestamp: string;
   volume: number;
   open: number;
@@ -216,8 +210,8 @@ export interface Option extends MinimalOption {
 
 export interface OptionChain {
   [price: number]: {
-    call: Option | MinimalOption | undefined | null;
-    put: Option | MinimalOption | undefined | null;
+    call: Option | undefined | null;
+    put: Option | undefined | null;
   };
 }
 
