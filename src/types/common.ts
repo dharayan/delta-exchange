@@ -182,7 +182,6 @@ export interface Candle {
   volume: number
 }
 
-
 export interface Option {
   id: number;
   symbol: string;

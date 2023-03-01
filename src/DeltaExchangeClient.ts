@@ -1,7 +1,21 @@
 import crypto from "crypto";
 import DeltaExchangeSocket from "./DeltaExchangeSocket";
-import {Balance, Candle, Option, OptionChain, OptionChains, Order, Position, Query, Ticker} from "./DeltaExchangeTypes";
+import {
+  Balance,
+  Candle,
+  LeverageChangeResult,
+  Option,
+  OptionChain,
+  OptionChains,
+  Order,
+  OrderResult,
+  Position,
+  Query,
+  Ticker
+} from "./types";
 import {Resolution, StopOrderType} from "./DeltaExchangeConstants";
+import * as fs from "fs";
+import * as path from "path";
 
 export class DeltaExchangeClient {
   private readonly api_key: string;
@@ -10,11 +24,13 @@ export class DeltaExchangeClient {
   private readonly authenticated: boolean;
   private lastAllOptionFetchTime: number = 0;
   private lastFetchedAllOptions: Option[] = [];
+  private readonly version: string;
 
   constructor(api_key?: string, api_secret?: string) {
     this.authenticated = !!(api_key && api_secret);
     this.api_key = api_key || "";
     this.api_secret = api_secret || "";
+    this.version = this.getVersion();
   }
 
   //! static methods
@@ -82,6 +98,18 @@ export class DeltaExchangeClient {
     }
   }
 
+  getVersion() {
+    if (this.version) {
+      return this.version
+    }
+    try {
+      const packageJson = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'))
+      return packageJson.version || "v0.0.0"
+    } catch (e) {
+      return "v0.0.0"
+    }
+  }
+
   isAuthenticated() {
     return this.authenticated;
   }
@@ -106,17 +134,18 @@ export class DeltaExchangeClient {
       headers['signature'] = signature
     }
 
-    headers['User-Agent'] = 'delta-exchange-rest-client-v0.2.3'
+    headers['User-Agent'] = 'delta-exchange-rest-client-' + this.version
 
     headers = {
       ...headers
     }
 
-    return await fetch(url, {
+    const data = await fetch(url, {
       method: method,
       headers: headers,
       body: method === "GET" ? undefined : payload ? JSON.stringify(payload) : undefined
-    }).then(res => res.json())
+    }).then(res => res.text())
+    return JSON.parse(data)
   }
 
   //! access account status and data
@@ -144,7 +173,7 @@ export class DeltaExchangeClient {
     return balancesObj;
   }
 
-  async setLeverage(product_id: string, leverage: number) {
+  async setLeverage(product_id: string, leverage: number): Promise<LeverageChangeResult> {
     return this.request(`/v2/products/${product_id}/orders/leverage`, "POST", {
       leverage: leverage
     }, undefined, true)
@@ -266,8 +295,11 @@ export class DeltaExchangeClient {
     return (await this.request(`/v2/tickers/${symbol}`)).result
   }
 
-  async getActiveOrders(): Promise<Order[]> {
-    return (await this.request(`/v2/orders`, 'GET', undefined, [], true))?.result
+  async getActiveOrders(page_size?: number): Promise<Order[]> {
+    return (await this.request(`/v2/orders`, 'GET', undefined, [{
+      key: 'page_size',
+      value: page_size ? String(page_size) : "100"
+    }], true))?.result
   }
 
   async getAllPositions(): Promise<Position[]> {
@@ -307,7 +339,7 @@ export class DeltaExchangeClient {
     // other details
     close_on_trigger?: boolean, client_order_id?: string, time_in_force?: string,
     reduce_only?: boolean, post_only?: boolean,
-  ) {
+  ): Promise<OrderResult> {
     return await this.request('/v2/orders', 'POST', {
       bracket_order,
       bracket_stop_loss_limit_price,

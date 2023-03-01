@@ -1,6 +1,6 @@
 {
   "name": "delta-exchange",
-  "version": "0.2.4",
+  "version": "0.3.2",
   "repository": "https://github.com/dharayan/delta-exchange",
   "license": "MIT",
   "scripts": {
@@ -10,8 +10,10 @@
     "ws": "^8.12.0"
   },
   "devDependencies": {
+    "@types/dotenv": "^8.2.0",
     "@types/node": "^18.11.18",
     "@types/ws": "^8.5.4",
+    "dotenv": "^16.0.3",
     "ts-node": "^10.9.1",
     "typescript": "^4.9.5"
   },
@@ -21,6 +23,7 @@
   "types": "lib/index.d.ts",
   "files": [
     "**/*.js",
-    "**/*.d.ts"
+    "**/*.d.ts",
+    "!**/types/*.js"
   ]
 }
