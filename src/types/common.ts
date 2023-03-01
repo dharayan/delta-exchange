@@ -1,26 +1,23 @@
 export interface Balance {
-  [asset: string]: {
-    asset_id: number,
-    asset_symbol: string,
-    available_balance: string,
-    balance: string,
-    commission: string,
-    id: number,
-    interest_credit: string,
-    order_margin: string,
-    pending_referral_bonus: string,
-    pending_trading_fee_credit: string,
-    portfolio_margin: string,
-    position_margin: string,
-    trading_fee_credit: string,
-    unvested_amount: string,
-    user_id: number,
-  }
+  asset_id: number,
+  asset_symbol: string,
+  available_balance: string,
+  balance: string,
+  commission: string,
+  id: number,
+  interest_credit: string,
+  order_margin: string,
+  pending_referral_bonus: string,
+  pending_trading_fee_credit: string,
+  portfolio_margin: string,
+  position_margin: string,
+  trading_fee_credit: string,
+  unvested_amount: string,
+  user_id: number,
 }
 
-export interface Query {
-  key: string;
-  value: string;
+export interface Balances {
+  [asset: string]: Balance
 }
 
 export interface Asset {

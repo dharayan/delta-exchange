@@ -1,7 +1,6 @@
 import crypto from "crypto";
-import DeltaExchangeSocket from "./DeltaExchangeSocket";
 import {
-  Balance,
+  Balances,
   Candle,
   LeverageChangeResult,
   Option,
@@ -10,12 +9,12 @@ import {
   Order,
   OrderResult,
   Position,
-  Query,
   Ticker
 } from "./types";
-import {Resolution, StopOrderType} from "./DeltaExchangeConstants";
+import {Method, Resolution, StopOrderType} from "./DeltaExchangeConstants";
 import * as fs from "fs";
 import * as path from "path";
+import {BracketOrderInput, LimitOrderInput, OrderInput, Query, RequestInput, StopOrderInput} from "./types/requests";
 
 export class DeltaExchangeClient {
   private readonly api_key: string;
@@ -69,7 +68,7 @@ export class DeltaExchangeClient {
     })
   }
 
-  static resolutionToMinute = (resolution: string) => {
+  static resolutionToMinute = (resolution: Resolution) => {
     switch (resolution) {
       case Resolution._1m:
         return 1
@@ -104,7 +103,7 @@ export class DeltaExchangeClient {
     }
     try {
       const packageJson = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'))
-      return packageJson.version || "v0.0.0"
+      return `v${packageJson.version}` || "v0.0.0"
     } catch (e) {
       return "v0.0.0"
     }
@@ -114,13 +113,21 @@ export class DeltaExchangeClient {
     return this.authenticated;
   }
 
-  async request(path: string, method: string = "GET", payload?: any, queries?: Query[], auth: boolean = false, base_url?: string, headers: any = {}) {
-    if (!base_url) {
-      base_url = this.base_url;
-    }
+  async request(requestInput: RequestInput) {
+    const {
+      path,
+      method = Method.GET,
+      payload = undefined,
+      queries = [],
+      auth = false,
+      base_url = this.base_url,
+      headers = {}
+    } = requestInput
+
     const url = base_url + path + DeltaExchangeClient.buildQuery(queries || [])
     headers['Content-Type'] = 'application/json'
     headers['Accept'] = 'application/json'
+    headers['User-Agent'] = 'delta-exchange-' + this.version
 
     if (auth) {
       if (!this.api_key || !this.api_secret) {
@@ -134,79 +141,84 @@ export class DeltaExchangeClient {
       headers['signature'] = signature
     }
 
-    headers['User-Agent'] = 'delta-exchange-rest-client-' + this.version
-
-    headers = {
-      ...headers
-    }
-
     const data = await fetch(url, {
       method: method,
       headers: headers,
       body: method === "GET" ? undefined : payload ? JSON.stringify(payload) : undefined
     }).then(res => res.text())
-    return JSON.parse(data)
+
+    try {
+      return JSON.parse(data)
+    } catch (e) {
+      console.log({
+        url,
+        data,
+        error: e
+      })
+    }
   }
 
   //! access account status and data
   async getAssets() {
-    return await this.request('/assets')
+    return await this.request({path: '/assets'})
   }
 
-  async getBalances(asset_id?: number): Promise<Balance> {
-    const balances = await this.request("/v2/wallet/balances", "GET", undefined, undefined, true)
-    if (asset_id) {
-      // filter by asset_id and return only one balance
-      for (const asset of balances.result) {
-        if (asset.asset_id === asset_id) {
-          return asset
-        }
-      }
-    }
-    const balancesObj: Balance = {}
-    try {
-      for (const asset of balances.result) {
-        balancesObj[asset.asset_symbol] = asset
-      }
-    } catch (e) {
-    }
+  async getBalance(asset: number | string): Promise<Balances | null> {
+    const balances = await this.request({path: "/v2/wallet/balances", auth: true})
+    for (const asset of balances.result)
+      if (asset.asset_id === asset || asset.asset_symbol === asset)
+        return asset
+    return null;
+  }
+
+  async getBalances(): Promise<Balances> {
+    const balances = await this.request({path: "/v2/wallet/balances", auth: true})
+    const balancesObj: Balances = {}
+    for (const asset of balances.result)
+      balancesObj[asset.asset_symbol] = asset
     return balancesObj;
   }
 
   async setLeverage(product_id: string, leverage: number): Promise<LeverageChangeResult> {
-    return this.request(`/v2/products/${product_id}/orders/leverage`, "POST", {
-      leverage: leverage
-    }, undefined, true)
+    return this.request({
+      path: `/v2/products/${product_id}/orders/leverage`,
+      method: Method.POST,
+      payload: {leverage: leverage},
+      auth: true
+    })
   }
 
-  async getOrderHistory(queries: Query[] = [], page_size = 10, after: any = undefined) {
-    if (after)
-      queries = [...queries, {key: 'after', value: after}];
-    if (page_size)
-      queries.push({key: 'page_size', value: String(page_size)});
-    return await this.request('/v2/orders/history', 'GET', undefined, queries)
+  async getOrderHistory(queries: Query[] = [], page_size = 10, after?: number) {
+    if (after) queries = [...queries, {key: 'after', value: String(after)}];
+    if (page_size) queries.push({key: 'page_size', value: String(page_size)});
+    return await this.request({path: '/v2/orders/history', queries: queries})
   }
 
   async getFillHistory(queries: Query[] = [], page_size = 10, after: any = undefined) {
-    if (after)
-      queries = [...queries, {key: 'after', value: after}];
-    if (page_size)
-      queries.push({key: 'page_size', value: String(page_size)});
-    return await this.request('/v2/fills', 'GET', undefined, queries)
+    if (after) queries = [...queries, {key: 'after', value: after}];
+    if (page_size) queries.push({key: 'page_size', value: String(page_size)});
+    return await this.request({path: '/v2/fills', queries: queries})
   }
 
   async changePositionMargin(product_id: string, delta_margin: number) {
-    return await this.request('/v2/positions/change_margin', 'POST', {
-      product_id: product_id,
-      delta_margin: delta_margin
-    }, undefined, true)
+    return await this.request({
+      path: '/v2/positions/change_margin',
+      method: Method.POST, auth: true,
+      payload: {
+        product_id: product_id,
+        delta_margin: delta_margin
+      }
+    })
   }
 
   async getPositions(product_ids: string[]): Promise<Position[]> {
-    return (await this.request('/v2/positions/margined', 'GET', undefined, [{
-      key: 'product_id',
-      value: product_ids.join(",")
-    }], true))?.result
+    return (await this.request({
+      path: '/v2/positions/margined', auth: true,
+      queries: [{
+        key: 'product_id',
+        value: product_ids.join(",")
+      }],
+    }))?.result
   }
 
   //! get contract details
@@ -216,24 +228,20 @@ export class DeltaExchangeClient {
         if (this.lastFetchedAllOptions.length > 0)
           return this.lastFetchedAllOptions
 
-    const allCallOptions = await this.request(`/v2/tickers?contract_types=call_options`)
-    const allPutOptions = await this.request(`/v2/tickers?contract_types=put_options`)
+    const allCallOptions = await this.request({path: `/v2/tickers?contract_types=call_options`})
+    const allPutOptions = await this.request({path: `/v2/tickers?contract_types=put_options`})
     const allOptions = [...allCallOptions.result, ...allPutOptions.result]
     const requiredOptions: Option[] = []
     for (const option of allOptions) {
       const optionBreakdown: string[] = option?.symbol?.split('-')
       if (!optionBreakdown || optionBreakdown.length < 1)
         continue
-
       if (symbol && optionBreakdown[1] !== symbol)
         continue
-
       if (expiry && optionBreakdown[3] !== expiry)
         continue;
-
       if (turnover_symbol && turnover_symbol !== option.turnover_symbol)
         continue
-
       requiredOptions.push({
         id: Number(option.product_id) || option.product_id,
         close: Number(option.close) || option.close,
@@ -287,40 +295,46 @@ export class DeltaExchangeClient {
       else
         console.log("unknown option type:", option.type)
     }
-    // console.log(optionChains)
     return optionChains
   }
 
   async getTickerDetails(symbol: string): Promise<Ticker> {
-    return (await this.request(`/v2/tickers/${symbol}`)).result
+    return (await this.request({path: `/v2/tickers/${symbol}`})).result
   }
 
   async getActiveOrders(page_size?: number): Promise<Order[]> {
-    return (await this.request(`/v2/orders`, 'GET', undefined, [{
-      key: 'page_size',
-      value: page_size ? String(page_size) : "100"
-    }], true))?.result
+    return (await this.request({
+      path: `/v2/orders`,
+      queries: [{
+        key: 'page_size',
+        value: page_size ? String(page_size) : "100"
+      }],
+      auth: true
+    }))?.result
   }
 
   async getAllPositions(): Promise<Position[]> {
-    return (await this.request('/v2/positions/margined', 'GET', undefined, undefined, true))?.result || []
+    return (await this.request({path: '/v2/positions/margined', auth: true}))?.result || []
   }
 
   async getOrderbook(symbol: string) {
-    return await this.request(`/v2/l2orderbook/${symbol}`)
+    return await this.request({path: `/v2/l2orderbook/${symbol}`})
   }
 
   async getSparklines(symbol: string) {
-    return await this.request(`/v2/sparklines`, 'GET', undefined, [{key: 'symbol', value: symbol}])
+    return await this.request({path: `/v2/sparklines`, queries: [{key: 'symbol', value: symbol}]})
   }
 
   async getOHLC(symbol: string, resolution: string, start: number, end: number): Promise<Candle[]> {
-    return (await this.request(`/v2/history/candles`, 'GET', undefined, [
-      {key: 'symbol', value: symbol},
-      {key: 'resolution', value: resolution},
-      {key: 'start', value: `${Math.floor(start / 1000)}`},
-      {key: 'end', value: `${Math.floor(end / 1000)}`}
-    ]))?.result
+    return (await this.request({
+      path: `/v2/history/candles`,
+      queries: [
+        {key: 'symbol', value: symbol},
+        {key: 'resolution', value: resolution},
+        {key: 'start', value: `${Math.floor(start / 1000)}`},
+        {key: 'end', value: `${Math.floor(end / 1000)}`}
+      ]
+    }))?.result
   }
 
   async getMarkOHLC(symbol: string, resolution: string, start: number, end: number) {
@@ -328,111 +342,52 @@ export class DeltaExchangeClient {
   }
 
   //! create trades
-  async createOrder(
-    // required
-    product_id: number, side: string, size: number, order_type: string, limit_price?: number,
-    // bracket order
-    bracket_order?: boolean, bracket_stop_loss_trigger_price?: number, bracket_stop_loss_limit_price?: number,
-    bracket_take_profit_trigger_price?: number, bracket_take_profit_limit_price?: number, bracket_trail_amount?: number,
-    // stop/limit order
-    stop_order_type?: string, stop_price?: number, stop_trigger_method?: string, trail_amount?: number,
-    // other details
-    close_on_trigger?: boolean, client_order_id?: string, time_in_force?: string,
-    reduce_only?: boolean, post_only?: boolean,
-  ): Promise<OrderResult> {
-    return await this.request('/v2/orders', 'POST', {
-      bracket_order,
-      bracket_stop_loss_limit_price,
-      bracket_stop_loss_price: bracket_stop_loss_trigger_price,
-      bracket_take_profit_limit_price,
-      bracket_take_profit_price: bracket_take_profit_trigger_price,
-      bracket_trail_amount: side === "buy" && bracket_trail_amount ? -bracket_trail_amount : bracket_trail_amount,
-      client_order_id,
-      close_on_trigger,
-      limit_price,
-      order_type,
-      product_id,
-      reduce_only,
-      side,
-      size,
-      stop_order_type,
-      stop_price,
-      stop_trigger_method,
-      time_in_force,
-      trail_amount: side === "buy" && trail_amount ? -trail_amount : trail_amount,
-      post_only,
-    }, undefined, true)
+  async createOrder(orderInput: OrderInput): Promise<OrderResult> {
+    const {
+      bracket_order, bracket_stop_loss_trigger_price, bracket_stop_loss_limit_price,
+      bracket_take_profit_trigger_price, bracket_take_profit_limit_price, bracket_trail_amount,
+      close_on_trigger, client_order_id, limit_price, order_type, product_id, reduce_only, side, size,
+      stop_order_type, stop_price, stop_trigger_method, time_in_force, trail_amount, post_only
+    } = orderInput
+    return await this.request({
+      path: '/v2/orders',
+      method: Method.POST,
+      payload: {
+        bracket_order,
+        bracket_stop_loss_limit_price,
+        bracket_stop_loss_price: bracket_stop_loss_trigger_price,
+        bracket_take_profit_limit_price,
+        bracket_take_profit_price: bracket_take_profit_trigger_price,
+        bracket_trail_amount: side === "buy" && bracket_trail_amount ? -bracket_trail_amount : bracket_trail_amount,
+        client_order_id,
+        close_on_trigger,
+        limit_price,
+        order_type,
+        product_id,
+        reduce_only,
+        side,
+        size,
+        stop_order_type,
+        stop_price,
+        stop_trigger_method,
+        time_in_force,
+        trail_amount: side === "buy" && trail_amount ? -trail_amount : trail_amount,
+        post_only,
+      },
+      auth: true
+    })
   }
 
-  async createBracketOrder(
-    // required
-    product_id: number, side: string, size: number, order_type: string, limit_price?: number,
-    // bracket order
-    bracket_order?: boolean, bracket_stop_loss_limit_price?: number, bracket_stop_loss_price?: number,
-    bracket_take_profit_limit_price?: number, bracket_take_profit_price?: number, bracket_trail_amount?: number,
-    stop_trigger_method?: string,
-    // other details
-    close_on_trigger?: boolean, client_order_id?: string, time_in_force?: string,
-    reduce_only?: boolean, post_only?: boolean,
-  ) {
-    return await this.createOrder(
-      // required
-      product_id, side, size, order_type, limit_price,
-      // bracket order
-      bracket_order, bracket_stop_loss_limit_price, bracket_stop_loss_price,
-      bracket_take_profit_limit_price, bracket_take_profit_price, bracket_trail_amount,
-      // stop/limit order
-      undefined, undefined, stop_trigger_method, undefined,
-      // other details
-      close_on_trigger, client_order_id, time_in_force,
-      reduce_only, post_only,
-    )
+  async createBracketOrder(bracketOrderInput: BracketOrderInput) {
+    return await this.createOrder(bracketOrderInput)
   }
 
-  async createStopOnlyOrder(
-    // required
-    product_id: number, side: string, size: number, order_type: string, stop_price: number,
-    // stop/limit order
-    limit_price?: number, trail_amount?: number, stop_trigger_method?: string,
-    // other details
-    close_on_trigger?: boolean, post_only?: boolean,
-    client_order_id?: string, time_in_force?: string
-  ) {
-    return await this.createOrder(
-      // required
-      product_id, side, size, order_type, limit_price,
-      // undefined(s)
-      undefined, undefined, undefined, undefined, undefined, undefined,
-      // stop order
-      StopOrderType.STOP_LOSS, stop_price, stop_trigger_method, trail_amount, close_on_trigger,
-      client_order_id, time_in_force, true, post_only
-    )
+  async createStopOnlyOrder(stopOrderInput: StopOrderInput) {
+    return await this.createOrder({...stopOrderInput, stop_order_type: StopOrderType.STOP_LOSS})
   }
 
-  async createLimitOrder(
-    // required
-    product_id: number, side: string, size: number, order_type: string, limit_price?: number,
-    // stop order
-    stop_order_type?: string, stop_price?: number, stop_trigger_method?: string, trail_amount?: number,
-    // other details
-    close_on_trigger?: boolean, client_order_id?: string, time_in_force?: string,
-    reduce_only?: boolean, post_only?: boolean,
-  ) {
-    return await this.createOrder(
-      // required
-      product_id, side, size, order_type, limit_price,
-      // bracket order
-      undefined, undefined, undefined, undefined, undefined, undefined,
-      // stop/limit order
-      stop_order_type, stop_price, stop_trigger_method, trail_amount,
-      // other details
-      close_on_trigger, client_order_id, time_in_force, reduce_only, post_only,
-    )
-  }
-
-  //! websockets
-  createSocket(): DeltaExchangeSocket {
-    return new DeltaExchangeSocket(this.api_key, this.api_secret)
+  async createLimitOrder(limitOrderInput: LimitOrderInput) {
+    return await this.createOrder(limitOrderInput)
   }
 }
 
