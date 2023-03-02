@@ -1,10 +1,13 @@
 {
   "name": "delta-exchange",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "repository": "https://github.com/dharayan/delta-exchange",
   "license": "MIT",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "dev-test": "ts-node test/index.ts",
+    "test-build": "tsc -p tsconfig-test.json",
+    "test": "node test/index.js"
   },
   "dependencies": {},
   "devDependencies": {
@@ -21,6 +24,7 @@
   "files": [
     "**/*.js",
     "**/*.d.ts",
-    "!**/types/*.js"
+    "!**/types/**/*.js",
+    "!test/**/*.*"
   ]
 }

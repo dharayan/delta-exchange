@@ -3,6 +3,10 @@ lib/
 node_modules/
 *.local/
 
+test/*
+!test/**/*.ts
+test/**/*.d.ts
+
 *.log
 *.tgz
 .env.*
