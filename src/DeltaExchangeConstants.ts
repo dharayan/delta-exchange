@@ -37,7 +37,7 @@ export enum ReduceOnly {
 
 export enum Resolution {
   _1m = "1m",
-  _2m = "2m",
+  _3m = "3m",
   _5m = "5m",
   _15m = "15m",
   _30m = "30m",
@@ -45,7 +45,6 @@ export enum Resolution {
   _2h = "2h",
   _4h = "4h",
   _6h = "6h",
-  _12h = "12h",
   _1d = "1d",
   _7d = "7d",
   _1w = "1w",
@@ -58,4 +57,17 @@ export enum Method {
   POST = "POST",
   PUT = "PUT",
   DELETE = "DELETE"
+}
+
+export enum MMP {
+  mmp1 = "mmp1",
+  mmp2 = "mmp2",
+  mmp3 = "mmp3",
+  mmp4 = "mmp4",
+  mmp5 = "mmp5",
+}
+
+export enum CloseOnTrigger {
+  TRUE = "true",
+  FALSE = "false"
 }

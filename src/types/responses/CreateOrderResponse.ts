@@ -40,7 +40,7 @@ interface resultType {
   size: number
 }
 
-export interface OrderResult {
+export interface CreateOrderResponse {
   result: resultType
   success: boolean
 }

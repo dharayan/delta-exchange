@@ -2,19 +2,26 @@ import crypto from "crypto";
 import {
   Balances,
   Candle,
+  CreateOrderResponse,
   LeverageChangeResult,
   Option,
   OptionChain,
   OptionChains,
   Order,
-  OrderResult,
   Position,
   Ticker
 } from "./types";
 import {Method, Resolution, StopOrderType} from "./DeltaExchangeConstants";
 import * as fs from "fs";
 import * as path from "path";
-import {BracketOrderInput, LimitOrderInput, OrderInput, Query, RequestInput, StopOrderInput} from "./types/requests";
+import {
+  CreateBracketOrderRequest,
+  CreateOrderRequest,
+  DeltaExchangeRequest,
+  LimitOrderRequest,
+  Query,
+  StopOrderRequest
+} from "./types/requests";
 
 export class DeltaExchangeClient {
   private readonly api_key: string;
@@ -113,7 +120,7 @@ export class DeltaExchangeClient {
     return this.authenticated;
   }
 
-  async request(requestInput: RequestInput) {
+  async request(requestInput: DeltaExchangeRequest) {
     const {
       path,
       method = Method.GET,
@@ -146,29 +153,11 @@ export class DeltaExchangeClient {
       headers: headers,
       body: method === "GET" ? undefined : payload ? JSON.stringify(payload) : undefined
     }).then(res => res.text())
-
-    try {
-      return JSON.parse(data)
-    } catch (e) {
-      console.log({
-        url,
-        data,
-        error: e
-      })
-    }
+    return JSON.parse(data)
   }
 
-  //! access account status and data
   async getAssets() {
-    return await this.request({path: '/assets'})
-  }
-
-  async getBalance(asset: number | string): Promise<Balances | null> {
-    const balances = await this.request({path: "/v2/wallet/balances", auth: true})
-    for (const asset of balances.result)
-      if (asset.asset_id === asset || asset.asset_symbol === asset)
-        return asset
-    return null;
+    return await this.request({path: '/v2/assets', auth: true})
   }
 
   async getBalances(): Promise<Balances> {
@@ -177,6 +166,14 @@ export class DeltaExchangeClient {
     for (const asset of balances.result)
       balancesObj[asset.asset_symbol] = asset
     return balancesObj;
+  }
+
+  async getBalance(asset: number | string): Promise<Balances | null> {
+    const balances = await this.request({path: "/v2/wallet/balances", auth: true})
+    for (const asset of balances.result)
+      if (asset.asset_id === asset || asset.asset_symbol === asset)
+        return asset
+    return null;
   }
 
   async setLeverage(product_id: string, leverage: number): Promise<LeverageChangeResult> {
@@ -203,7 +200,8 @@ export class DeltaExchangeClient {
   async changePositionMargin(product_id: string, delta_margin: number) {
     return await this.request({
       path: '/v2/positions/change_margin',
-      method: Method.POST, auth: true,
+      method: Method.POST,
+      auth: true,
       payload: {
         product_id: product_id,
         delta_margin: delta_margin
@@ -213,7 +211,8 @@ export class DeltaExchangeClient {
 
   async getPositions(product_ids: string[]): Promise<Position[]> {
     return (await this.request({
-      path: '/v2/positions/margined', auth: true,
+      path: '/v2/positions/margined',
+      auth: true,
       queries: [{
         key: 'product_id',
         value: product_ids.join(",")
@@ -221,7 +220,6 @@ export class DeltaExchangeClient {
     }))?.result
   }
 
-  //! get contract details
   async getOptions(symbol?: string, expiry?: string, turnover_symbol?: string): Promise<Option[]> {
     if (!symbol)
       if (this.lastAllOptionFetchTime + 1000 * 30 > Date.now())
@@ -341,52 +339,35 @@ export class DeltaExchangeClient {
     return this.getOHLC(`MARK:${symbol}`, resolution, start, end)
   }
 
-  //! create trades
-  async createOrder(orderInput: OrderInput): Promise<OrderResult> {
-    const {
-      bracket_order, bracket_stop_loss_trigger_price, bracket_stop_loss_limit_price,
-      bracket_take_profit_trigger_price, bracket_take_profit_limit_price, bracket_trail_amount,
-      close_on_trigger, client_order_id, limit_price, order_type, product_id, reduce_only, side, size,
-      stop_order_type, stop_price, stop_trigger_method, time_in_force, trail_amount, post_only
-    } = orderInput
+  async createOrder(orderRequest: CreateOrderRequest): Promise<CreateOrderResponse> {
+    const {side, trail_amount} = orderRequest
     return await this.request({
       path: '/v2/orders',
       method: Method.POST,
       payload: {
-        bracket_order,
-        bracket_stop_loss_limit_price,
-        bracket_stop_loss_price: bracket_stop_loss_trigger_price,
-        bracket_take_profit_limit_price,
-        bracket_take_profit_price: bracket_take_profit_trigger_price,
-        bracket_trail_amount: side === "buy" && bracket_trail_amount ? -bracket_trail_amount : bracket_trail_amount,
-        client_order_id,
-        close_on_trigger,
-        limit_price,
-        order_type,
-        product_id,
-        reduce_only,
-        side,
-        size,
-        stop_order_type,
-        stop_price,
-        stop_trigger_method,
-        time_in_force,
-        trail_amount: side === "buy" && trail_amount ? -trail_amount : trail_amount,
-        post_only,
+        ...orderRequest,
+        trail_amount: side === "buy" && trail_amount ? -trail_amount : trail_amount
       },
       auth: true
     })
   }
 
-  async createBracketOrder(bracketOrderInput: BracketOrderInput) {
-    return await this.createOrder(bracketOrderInput)
+  async createBracketOrder(bracketOrderRequest: CreateBracketOrderRequest) {
+    return await this.request({
+      path: '/v2/orders/bracket',
+      method: Method.POST,
+      payload: {
+        ...bracketOrderRequest
+      },
+      auth: true
+    })
   }
 
-  async createStopOnlyOrder(stopOrderInput: StopOrderInput) {
+  async createStopOnlyOrder(stopOrderInput: StopOrderRequest) {
     return await this.createOrder({...stopOrderInput, stop_order_type: StopOrderType.STOP_LOSS})
   }
 
-  async createLimitOrder(limitOrderInput: LimitOrderInput) {
+  async createLimitOrder(limitOrderInput: LimitOrderRequest) {
     return await this.createOrder(limitOrderInput)
   }
 }

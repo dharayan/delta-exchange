@@ -1,3 +1,3 @@
 export * from './common'
 export * from './responses/LeverageChangeResult'
-export * from './responses/OrderResult'
+export * from './responses/CreateOrderResponse'
