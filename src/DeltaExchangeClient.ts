@@ -4,7 +4,7 @@ import {
   Candle,
   CreateBracketOrderRequest,
   CreateOrderRequest,
-  CreateOrderResponse,
+  CreateOrderResponse, DeleteOrderRequest,
   EditBracketOrderRequest,
   LeverageChangeResult,
   Option,
@@ -362,7 +362,18 @@ export class DeltaExchangeClient {
   async editBracketOrder(bracketOrderRequest: EditBracketOrderRequest) {
     return await this.request({
       path: '/v2/orders/bracket',
-      method: Method.POST,
+      method: Method.PUT,
+      payload: {
+        ...bracketOrderRequest
+      },
+      auth: true
+    })
+  }
+
+  async deleteOrder(bracketOrderRequest: DeleteOrderRequest) {
+    return await this.request({
+      path: '/v2/orders/bracket',
+      method: Method.DELETE,
       payload: {
         ...bracketOrderRequest
       },

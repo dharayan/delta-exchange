@@ -98,4 +98,7 @@ export interface EditBracketOrderRequest {
   bracket_trail_amount?: string
 }
 
-export type tk = EditBracketOrderRequest["id"]
+export interface DeleteOrderRequest {
+  id: number
+  product_id: number
+}
