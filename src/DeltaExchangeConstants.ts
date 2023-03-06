@@ -60,6 +60,7 @@ export enum Method {
 }
 
 export enum MMP {
+  disabled = "disabled",
   mmp1 = "mmp1",
   mmp2 = "mmp2",
   mmp3 = "mmp3",

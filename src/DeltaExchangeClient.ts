@@ -2,26 +2,22 @@ import crypto from "crypto";
 import {
   Balances,
   Candle,
+  CreateBracketOrderRequest,
+  CreateOrderRequest,
   CreateOrderResponse,
+  EditBracketOrderRequest,
   LeverageChangeResult,
   Option,
   OptionChain,
   OptionChains,
   Order,
   Position,
-  Ticker
+  Ticker,
 } from "./types";
 import {Method, Resolution, StopOrderType} from "./DeltaExchangeConstants";
 import * as fs from "fs";
 import * as path from "path";
-import {
-  CreateBracketOrderRequest,
-  CreateOrderRequest,
-  DeltaExchangeRequest,
-  LimitOrderRequest,
-  Query,
-  StopOrderRequest
-} from "./types/requests";
+import {DeltaExchangeRequest, LimitOrderRequest, Query, StopOrderRequest} from "./types/requests";
 
 export class DeltaExchangeClient {
   private readonly api_key: string;
@@ -353,6 +349,17 @@ export class DeltaExchangeClient {
   }
 
   async createBracketOrder(bracketOrderRequest: CreateBracketOrderRequest) {
+    return await this.request({
+      path: '/v2/orders/bracket',
+      method: Method.POST,
+      payload: {
+        ...bracketOrderRequest
+      },
+      auth: true
+    })
+  }
+
+  async editBracketOrder(bracketOrderRequest: EditBracketOrderRequest) {
     return await this.request({
       path: '/v2/orders/bracket',
       method: Method.POST,
