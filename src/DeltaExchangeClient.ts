@@ -30,7 +30,7 @@ export class DeltaExchangeUnauthenticatedClient {
 
     constructor(base_url?: string) {
         this.version = this.getVersion();
-        base_url = base_url || this.base_url;
+        this.base_url = base_url || this.base_url;
     }
 
     getVersion() {
