@@ -247,7 +247,7 @@ export class DeltaExchangeUnauthenticatedClient {
         return this.getOHLC(`MARK:${symbol}`, resolution, start, end)
     }
 
-    async getAllProducts(types: ContractTypes[] = []): Promise<Product> {
+    async getAllProducts(types: ContractTypes[] = []): Promise<Product[]> {
         return this.request({
             path: '/v2/products',
             queries: [{
