@@ -1,13 +1,13 @@
 import {
-  CloseOnTrigger,
-  MMP,
-  OrderType,
-  PostOnly,
-  ReduceOnly,
-  Side,
-  StopOrderType,
-  StopTriggerMethod,
-  TimeInForce
+    CloseOnTrigger,
+    MMP,
+    OrderType,
+    PostOnly,
+    ReduceOnly,
+    Side,
+    StopOrderType,
+    StopTriggerMethod,
+    TimeInForce
 } from "../../../DeltaExchangeConstants";
 
 interface Test {
@@ -53,8 +53,8 @@ export interface CreateOrderRequest {
   bracket_take_profit_price?: string
   time_in_force?: TimeInForce
   mmp?: MMP
-  post_only?: PostOnly
-  reduce_only?: ReduceOnly
+  post_only?: PostOnly | boolean
+  reduce_only?: ReduceOnly | boolean
   close_on_trigger?: CloseOnTrigger
   client_order_id?: string
 }
@@ -84,6 +84,8 @@ export interface CreateBracketOrderRequest {
     // Required if its a limit order
     limit_price?: string
   }
+  bracket_stop_trigger_method?: StopTriggerMethod
+  // @deprecated use bracket_stop_trigger_method, the name the api takes; still accepted and sent as bracket_stop_trigger_method
   stop_trigger_method?: StopTriggerMethod
 }
 
@@ -96,6 +98,7 @@ export interface EditBracketOrderRequest {
   bracket_take_profit_limit_price?: string
   bracket_take_profit_price?: string
   bracket_trail_amount?: string
+  bracket_stop_trigger_method?: StopTriggerMethod
 }
 
 export interface DeleteOrderRequest {
